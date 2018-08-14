@@ -4,6 +4,7 @@ haproxy_socket: /var/lib/haproxy/stats
 haproxy_chroot: /var/lib/haproxy
 haproxy_user: haproxy
 haproxy_group: haproxy
+haproxy_snakeoil_cert: /etc/ssl/private/mage-snakeoil-combined.pem
 
 haproxy_frontends: []
 haproxy_backends: []

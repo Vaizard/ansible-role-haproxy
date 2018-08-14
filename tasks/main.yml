@@ -46,6 +46,17 @@
   # Since this is an external role we can't assume it's been run
   when: "selinux_enabled | default(False)"
 
+- stat: path=/etc/haproxy/crt-list.txt
+  register: st
+
+- name: Copy HAProxy crt-list.
+  become: yes
+  template:
+    src: "crt-list.txt.j2"
+    dest: /etc/haproxy/crt-list.txt
+    mode: 0644
+  when: not st.stat.exists
+
 - name: Copy HAProxy configuration in place.
   become: yes
   template:
@@ -54,7 +65,17 @@
     mode: 0644
     validate: haproxy -f %s -c -q
   notify: restart haproxy
+  register: config
 
 - name: Ensure HAProxy is started and enabled on boot.
   become: yes
   service: name=haproxy state=started enabled=yes
+
+# Conditional restart below because of https://github.com/ansible/ansible/issues/15476
+# Restarting the HAProxy service needs to be role-scoped, to make sure follow-up roles
+# such as mage-certbot get the expected machine state.
+- name: Restart HAProxy.
+  become: yes
+  service: name=haproxy state=restarted enabled=yes
+  when: config.changed
+
