@@ -57,6 +57,9 @@
     mode: 0644
   when: not st.stat.exists
 
+# The validation check can procure some false positives, i.e.:
+# "Can't create DNS resolution for server" and "[ALERT]: Error(s) found in configuration file"
+# If this repeats often, comment out the validate directive.
 - name: Copy HAProxy configuration in place.
   become: yes
   template:
