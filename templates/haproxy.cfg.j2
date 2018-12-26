@@ -18,13 +18,9 @@ global
 {% endfor %}
 
 defaults
-  log global
-  mode  http
-  option  httplog
-  option  dontlognull
-  timeout connect 5000
-  timeout client 50000
-  timeout server 50000
+{% for def in haproxy_defaults %}
+  {{ def }}
+{% endfor %}
 {% if ansible_os_family == 'Debian' %}
   errorfile 400 /etc/haproxy/errors/400.http
   errorfile 403 /etc/haproxy/errors/403.http
