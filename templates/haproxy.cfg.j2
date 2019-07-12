@@ -31,6 +31,13 @@ defaults
   errorfile 504 /etc/haproxy/errors/504.http
 {% endif %}
 
+{% for k, v in haproxy_auth.iteritems() %}
+userlist {{ k }}
+  {% for user in v %}
+  user {{ user.username }} password {{ user.password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}
+  {% endfor %}
+{% endfor %}
+
 {% for front in haproxy_frontends %}
 frontend {{ front.name }}
 {% if front.address is string %}

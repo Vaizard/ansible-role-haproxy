@@ -1,14 +1,21 @@
 ---
+
+- name: Ensure apt repo is configured
+  apt_repository:
+    repo: "{{ haproxy_apt_repo }}"
+    state: "{{ 'present' if haproxy_use_apt_repo | default('absent') }}"
+
 - name: Ensure HAProxy is installed
-  become: yes
-  package:
+  become: true
+  apt:
     name: "{{ haproxy_package_name }}"
+    update_cache: yes
     state: present
 
 - name: configure haproxy logrotation
   become: true
   template:
-    backup: no
+    backup: false
     dest: /etc/logrotate.d/haproxy
     src: logrotated-haproxy.j2
 
@@ -18,7 +25,7 @@
 - name: configure haproxy log file
   become: true
   template:
-    backup: no
+    backup: false
     # Deliberately named to overwrite the ubuntu haproxy config:
     dest: /etc/rsyslog.d/49-haproxy.conf
     src: rsyslogd-haproxy.j2
@@ -27,7 +34,7 @@
   - restart rsyslog
 
 - name: Ensure HAProxy is enabled (so init script will start it on Debian).
-  become: yes
+  become: true
   lineinfile:
     dest: /etc/default/haproxy
     regexp: "^ENABLED.+$"
