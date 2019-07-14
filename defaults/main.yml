@@ -26,6 +26,14 @@ haproxy_defaults:
 # Set this to True to configure syslog file logging
 haproxy_syslog_enable: false
 
+haproxy_auth: []
+# haproxy_auth:
+#   my_list1:
+#     - { username: user1, password: pass }
+#   my_list2:
+#     - { username: user2, password: passw }
+#     - { username: user3, password: passwd }
+
 # If you want to log to a file you need to configure rsyslog, but this may
 # have global effects on syslog
 # This variable is for convenience, set to True if this is the only role

@@ -1,42 +1,44 @@
 global
-  log /dev/log  local0
-  log /dev/log  local1 notice
+    log /dev/log  local0
+    log /dev/log  local1 notice
 {% if haproxy_syslog_enable %}
-  log 127.0.0.1 {{ haproxy_syslog_dest }} notice
+    log 127.0.0.1 {{ haproxy_syslog_dest }} notice
 {% endif %}
 {% if haproxy_socket != '' %}
-  stats socket {{ haproxy_socket }} level admin
+    stats socket {{ haproxy_socket }} level admin
 {% endif %}
 {% if haproxy_chroot != '' %}
-  chroot {{ haproxy_chroot }}
+    chroot {{ haproxy_chroot }}
 {% endif %}
-  user {{ haproxy_user }}
-  group {{ haproxy_group }}
-  daemon
+    user {{ haproxy_user }}
+    group {{ haproxy_group }}
+    daemon
 {% for global_var in haproxy_global_vars %}
-  {{ global_var }}
+    {{ global_var }}
 {% endfor %}
 
 defaults
 {% for def in haproxy_defaults %}
-  {{ def }}
+    {{ def }}
 {% endfor %}
 {% if ansible_os_family == 'Debian' %}
-  errorfile 400 /etc/haproxy/errors/400.http
-  errorfile 403 /etc/haproxy/errors/403.http
-  errorfile 408 /etc/haproxy/errors/408.http
-  errorfile 500 /etc/haproxy/errors/500.http
-  errorfile 502 /etc/haproxy/errors/502.http
-  errorfile 503 /etc/haproxy/errors/503.http
-  errorfile 504 /etc/haproxy/errors/504.http
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
 {% endif %}
 
+{% if haproxy_auth is defined and haproxy_auth | length > 0 %}
 {% for k, v in haproxy_auth.iteritems() %}
 userlist {{ k }}
   {% for user in v %}
   user {{ user.username }} password {{ user.password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}
   {% endfor %}
 {% endfor %}
+{% endif %}
 
 {% for front in haproxy_frontends %}
 frontend {{ front.name }}

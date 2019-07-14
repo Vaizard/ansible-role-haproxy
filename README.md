@@ -90,36 +90,66 @@ Advanced users can override the template used for `haproxy.cfg` by setting `hapr
 
 ## Using this role with letsencrypt
 
-A reliable haproxy+letsencrypt ansible-managed setup can be achieved by using this role along with https://github.com/vaizard/mage-certbot (another fork of Jeff Geerling's awesome work). Below is an example configuration of frontends 
-(with rules for /.well-known/acme-challenge/) as well as required letsencrypt backends (port 8888 for the http-01 challenge). The rest is a (relatively) sane lamp-stack configuration example.
+A reliable haproxy+letsencrypt ansible-managed setup can be achieved by using this role along with https://github.com/vaizard/mage-certbot (another fork of Jeff Geerling's awesome work). Below is a close to
+production example configuration which includes
+
+- certbot managed certificate setup for several domains + required letsencrypt backends (port 8888 for the http-01 challenge)
+- basic haproxy configuration
+- backend configuration for a lamp stack server, a git server and a wekan application server
+- frontend definitions including rules for `/.well-known/acme-challenge/` paths, proxy-side basic authentication and some www.domain.com -> domain.com redirects
 
 ```yaml
-### base-common configuration
-dhparam_size: 2048
-
+---
 ### letsencrypt
 certbot_certs:
-  - domains: 
-      - ct01.example.com
+  - domains:
+      - password-protected-domain.com
+  - domains:
+      - example.com
+      - www.example.com
+  - domains:
+      - git.example.com
+      - project.example.com
 
+### haproxy basic auth
+haproxy_auth:
+  my_user_list:
+    - { username: mage, password: pass101 }
+    - { username: warlock, password: sapp010 }
+ my_other_list:
+    - { username: uff, password: cantremember }
 
 ### haproxy frontends
+__https:
+  - 'acl is_certbot path_beg -i /.well-known/acme-challenge/'
+  - 'use_backend be_certbot_ssl if is_certbot'
+  - 'acl is_authorized http_auth(my_user_list)'
+  - 'http-request auth realm MyProtectedRealm if { hdr(host) -i password-protected-domain.com } !is_authorized !is_certbot'
+
+__http:
+  - 'acl is_certbot path_beg -i /.well-known/acme-challenge/'
+  - 'redirect scheme https code 301 if !{ ssl_fc } !is_certbot'
+  - 'use_backend be_certbot if is_certbot'
+
+__backend:
+  - 'use_backend be_gitea if { hdr(host) -i git.example.com }'
+  - 'use_backend be_wekan if { hdr(host) -i project.example.com }'
+
+__redirect:
+  - 'redirect prefix https://example.com code 301 if { hdr(host) -i www.example.com } !is_certbot'
+  - 'redirect prefix https://password-protected-domain.com code 301 if { hdr(host) -i www.password-protected-domain.com } !is_certbot'
+
 haproxy_frontends:
   - name: fe_http
     address: '*:80'
     backend: 'be_lamp'
-    params:
-      - 'acl is_certbot path_beg -i /.well-known/acme-challenge/'
-      - 'use_backend be_certbot if is_certbot'
-      - 'redirect scheme https code 301 if !{ ssl_fc } !is_certbot' 
+    params: "{{ __http + __backend + __redirect }}"
+
   - name: fe_https
     address: '*:443'
-    bind_params: ssl crt-list /etc/haproxy/crt-list.txt
-    params:
-      - 'acl is_certbot_ssl path_beg -i /.well-known/acme-challenge/'
-      - 'use_backend be_certbot_ssl if is_certbot_ssl'
+    bind_params: ssl crt-list /etc/haproxy/crt-list.txt alpn h2,http/1.1
+    params: "{{ __https + __backend + __redirect }}"
     backend: 'be_lamp'
-
 
 ### haproxy backends
 haproxy_backends:
@@ -136,7 +166,7 @@ haproxy_backends:
       - 'compression type text/css text/javascript text/xml text/plain text/x-component application/javascript application/json application/xml application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml'
     servers:
       - name: srv_lamp
-        address: "ct01-lamp.lxd:80"
+        address: "container-lamp.lxd:80"
   - name: be_certbot
     check: false
     servers:
@@ -147,6 +177,33 @@ haproxy_backends:
     servers:
       - name: srv_certbot_ssl
         address: 0.0.0.0:8889
+  - name: be_gitea
+    check: false
+    options:
+      - 'forwardfor'
+      - 'http-server-close'
+    params:
+      - 'http-request set-header X-Forwarded-Port %[dst_port]'
+      - 'http-request add-header X-Forwarded-Proto https if { ssl_fc }'
+      - 'compression algo gzip'
+      - 'compression type text/css text/javascript text/xml text/plain text/x-component application/javascript application/json application/xml application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml'
+    servers:
+      - name: srv_gitea
+        address: "container-gitea.lxd:3000"
+  - name: be_wekan
+    check: false
+    options:
+      - 'forwardfor'
+      - 'http-server-close'
+    params:
+      - 'http-request set-header X-Forwarded-Port %[dst_port]'
+      - 'http-request add-header X-Forwarded-Proto https if { ssl_fc }'
+      - 'compression algo gzip'
+      - 'compression type text/css text/javascript text/xml text/plain text/x-component application/javascript application/json application/xml application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml'
+    servers:
+      - name: srv_gitea
+        address: "container-wekan.lxd:8080"
+
 
 # https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
 haproxy_global_vars:
@@ -155,7 +212,6 @@ haproxy_global_vars:
   - 'ssl-default-bind-options no-sslv3 no-tls-tickets'
   - 'ssl-default-server-ciphers ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS'  
   - 'ssl-default-server-options no-sslv3 no-tls-tickets'
-
 ```
 
 ## License
