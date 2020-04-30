@@ -32,7 +32,7 @@ defaults
 {% endif %}
 
 {% if haproxy_auth is defined and haproxy_auth | length > 0 %}
-{% for k, v in haproxy_auth.iteritems() %}
+{% for k, v in haproxy_auth.items() %}
 userlist {{ k }}
   {% for user in v %}
   user {{ user.username }} password {{ user.password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}

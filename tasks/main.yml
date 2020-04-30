@@ -55,6 +55,8 @@
 
 - stat: path=/etc/haproxy/crt-list.txt
   register: st
+  tags:
+    - config
 
 - name: Copy HAProxy crt-list.
   become: true
@@ -63,6 +65,8 @@
     dest: /etc/haproxy/crt-list.txt
     mode: 0644
   when: not st.stat.exists
+  tags:
+    - config
 
 # The validation check can procure some false positives, i.e.:
 # "Can't create DNS resolution for server" and "[ALERT]: Error(s) found in configuration file"
@@ -76,6 +80,8 @@
     validate: haproxy -f %s -c -q
   notify: restart haproxy
   register: config
+  tags:
+    - config
 
 - name: Ensure HAProxy is started and enabled on boot.
   become: true
