@@ -1,6 +1,6 @@
 ---
 haproxy_package_name: haproxy
-haproxy_apt_repo: ppa:vbernat/haproxy-1.9
+haproxy_apt_repo: ppa:vbernat/haproxy-2.2
 haproxy_use_apt_repo: true
 haproxy_socket: /var/lib/haproxy/stats
 haproxy_chroot: /var/lib/haproxy
